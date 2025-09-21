@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import type { ButtonProps } from '@nuxt/ui';
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuth } from '@/composables/useAuth';
+import { useUserStore } from '@/store/auth';
+
+const { login, error } = useAuth()
+
+const router = useRouter()
+
+const loginError = ref<string | null>(null);
 
 const fields = ref([
     {
@@ -17,7 +26,7 @@ const fields = ref([
         placeholder: 'Enter your password',
         required: true
     }
-]);
+])
 
 const providers = ref<ButtonProps[]>([
     {
@@ -34,10 +43,28 @@ const providers = ref<ButtonProps[]>([
         variant: 'subtle',
         block: true
     }
-]);
+])
 
-function onSubmit(payload: Record<string, any>) {
-    console.log('Form submitted with data:', payload["data"].email, payload["data"].password);
+async function onSubmit(payload: Record<string, any>) {
+    const email = payload?.data?.email
+    const password = payload?.data?.password
+
+    if (!email || !password) {
+        loginError.value = 'Email and password are required.'
+        return
+    }
+
+    try {
+        const user = await login(email, password)
+
+        const store = useUserStore()
+        store.login(user.access_token)
+
+        loginError.value = null
+        router.push('/dashboard')
+    } catch (e: any) {
+        loginError.value = error.value || e?.message || 'Invalid credentials'
+    }
 }
 </script>
 
@@ -52,7 +79,8 @@ function onSubmit(payload: Record<string, any>) {
                 <ULink to="#" class="text-primary font-medium" tabindex="-1">Forgot password?</ULink>
             </template>
             <template #validation>
-                <UAlert color="error" icon="i-lucide-info" title="Error signing in" />
+                <UAlert v-if="loginError" color="error" icon="i-lucide-info" title="Error signing in">{{ loginError }}
+                </UAlert>
             </template>
             <template #footer>
                 By signing in, you agree to our <ULink to="#" class="text-primary font-medium">Terms of Service</ULink>.
